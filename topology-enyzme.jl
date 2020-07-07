@@ -466,64 +466,119 @@ function createNetworkModel(bsp,fsp,k=trueK,q=trueQ,enzyme=enzyme)
         # Optional arguments: k values, q values, enzymes.
         # Set to true values by default for now.
     # Output: model with random toplogy
-    # Puts in true k and q values, basicEnzyme as reaction type, and ignores reg for now.
-    reactions = Array{Reaction}(undef, length(rxns))
-    check = false # When the proposed model meets criteria, this will become true and while loop ends
-    reg = ["x"] # Take this line out later when adding regulation parameters
-    sList = fill("x",(length(rxns),1)) # "Empty" lists of selected substrates and products
-    pList = fill("x",(length(rxns),1))
-    while check == false
-        for i = 1:length(rxns)
-            tempfsp = deepcopy(fsp)
-            tempbsp = bsp
+    # Puts in true k and q values, basicEnzyme as reaction type, and ignores
+    # reg for now.
 
-            # substrate selection
-            if i == 1
-                s = [bsp[1]] # ensure that at least one rxn has X0 as substrate
+    # Let's allocate some arrays!
+    reactions = fill(Reaction(["s"], ["p"], ["reg"], basicEnzyme, 1.0),
+    (length(enzyme)))
+
+    sub_list = Array{String,1}(undef,0)
+    enzyme_list = shuffle!(deepcopy(enzyme))
+    sp_sets = fill(("s","p"), (length(enzyme)))
+    reg = ["reg"]
+
+    # First substrate: Xo
+    # First product: random selection from floating species
+    s1 = bsp[1]
+    α = rand(1:1:length(fsp))
+    p1 = fsp[α]
+    sp_sets[1] = (s1,p1)
+    reactions[1].substrate = [s1]
+    reactions[1].product = [p1]
+
+    # Second substrate: random selection from floating species
+    # Second product: X1
+    α = rand(1:1:length(fsp))
+    s2 = fsp[α]
+    p2 = bsp[2]
+    sp_sets[2] = (s2,p2)
+    reactions[2].substrate = [s2]
+    reactions[2].product = [p2]
+
+    # Substrate selection for reactions 3:end
+    for i = 3:length(enzyme)
+        # substrate selection
+        if (i-2) <= length(fsp) # add each floating species as a substrate first
+            s = fsp[i-2]
+        else # once every floating species is used, pick randomly
+            β = rand(1)
+            if β[1] < 0.05
+                s = bsp[1]
             else
-                β = rand(1)
-                if β[1] < 0.1 # Small probability that X0 is substrate for more than 1 rxn
-                    s = bsp[1]
-                else
-                    α = rand(1:1:length(tempfsp))
-                    s = tempfsp[α] # randomly select substrate from list of floating species
-                    filter!(tempfsp->tempfsp≠s,tempfsp) # remove substrate from list to prevent it from being selected as a product
-                end
-                sList[i] = s
-                s = [s] # convert to correct type (string array) for Reaction structure
+                α = rand(1:1:length(fsp))
+                s = fsp[α]
             end
+        end
+        push!(sub_list,s)
+    end
 
-            # product selection
-            if i == 2
-                p = [bsp[2]] # ensure that X1 is the product of at least one reaction
-            else
-                β = rand(1)
-                if β[1] < 0.1 # Small probability that X1 is product for more than 1 rxn
-                    p = bsp[1]
+    # product selection for reactions 3:end
+    @label product_selection
+    println("we visited the product_selection label")
+    prod_list = deepcopy(fsp)
+    sp_sets[3:end] = fill(("s","p"),(length(sp_sets)-2,1))
+    println("Sets are ", sp_sets)
+    for i = 3:length(rxns)
+        s = sub_list[i-2]
+        p = s
+        while p == s
+            # repeat product selection until a product that is different from
+            # the substrate is selected
+            set = (s, p)
+            sp_sets[i] = set
+            let set = set
+                if length(prod_list) != 0
+                    # If there are still species that
+                    #have not been products, use those
+                    if prod_list == [s]
+                        #If the only product left to choose from is the same as
+                        # the substrate, back track 1 reaction and re-do
+                        # selection
+                        println("product list exception block reached")
+                        println("prod_list= ", prod_list)
+                        @goto product_selection
+                    end
+                    let counter = 1 # To prevent infinite loops
+                        while isPairIn(set, sp_sets) == true
+                            if counter > 10
+                                println("Invalid Model")
+                                @goto product_selection
+                                #@goto endfunction
+                            end
+                            α = rand(1:1:length(prod_list))
+                            p = prod_list[α]
+                            set = (s,p)
+                            counter += 1
+                        end
+                    end #of let counter...
                 else
-                    α = rand(1:1:length(tempfsp))
-                    p = tempfsp[α] # randomly select product from list of floating species with substrate omitted
-                end
-                pList[i]=p
-                p = [p] # convert to correct type (string array) for Reaction structure
-            end
-
-            # Check that every species is included as both a product and a substrate at least once
-            # If this criterion isn't met, repeat species selection process
-            check = true
-            for sp in fsp
-                # println(sp, typeof(sp))
-                if (sp in sList) == false
-                    check = false
-                elseif (sp in pList) == false
-                    check = false
-                end
-            end # of check fsp for-loop
-            reactions[i] = Reaction(s,p,reg,basicEnzyme,enzyme[i])
-        end # of reaction for loop
-    end # of while loop
+                    #if every species has been a product once, choose randomly
+                    # from all of them for remaining reactions
+                    while isPairIn(set, sp_sets) == true
+                        println("we are in the while loop on line 84")
+                        β = rand(1)
+                        println("Beta on line 96 is ", β)
+                        if β[1] < 0.05
+                                p = bsp[2]
+                        else
+                            println(length(fsp))
+                            α = rand(1:1:length(fsp))
+                            p = fsp[α]
+                        end
+                        set = (s,p)
+                    end #of while isPairIn while-loop
+                end # if prod_list list != 0o
+            end # of "let" block
+        end #of while p==s loop
+        filter!(prod_list->prod_list≠p,prod_list)
+        sp_sets[i] = (s,p)
+        reactions[i] = Reaction([s],[p],reg,basicEnzyme,enzyme_list[i])
+    end # of reaction for-loop
     m = Model(bsp,fsp,reactions,trueK,trueQ,by)
-    return m
+    #return m
+    @label endfunction
+    return sp_sets
 end
 
 function isPairIn(sp, spArray)
