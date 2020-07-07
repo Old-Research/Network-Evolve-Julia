@@ -160,7 +160,8 @@ function odefunc!(du,fy, m, t)
     return du
 end
 #--------REACTION TYPES----------------------
-function basicEnzyme(substrate::Float64, product::Float64, enzyme::Float64, k::Float64, q::Float64)
+function basicEnzyme(substrate::Float64, product::Float64, enzyme::Float64,
+    k::Float64, q::Float64)
     return enzyme*k*(substrate - (product/q))
 end
 
@@ -168,15 +169,18 @@ function uniuni(substrate::Float64,product::Float64,k1::Float64,k2::Float64)
     return k1*substrate-product*k2
 end
 
-function biuni(substrate1::Float64, substrate2::Float64, product::Float64, k1::Float64, k2::Float64)
+function biuni(substrate1::Float64, substrate2::Float64, product::Float64,
+    k1::Float64, k2::Float64)
     return k1*(substrate1+substrate2) - k2*product
 end
 
-function unibi(substrate::Float64, product1::Float64, product2::Float64, k1::Float64, k2::Float64)
+function unibi(substrate::Float64, product1::Float64, product2::Float64,
+    k1::Float64, k2::Float64)
     k1*substrate - k2*(product1+product2)
 end
 
-function bibi(substrate1::Float64, substrate2::Float64,product1::Float64, product2::Float64, k1::Float64, k2::Float64)
+function bibi(substrate1::Float64, substrate2::Float64,product1::Float64,
+    product2::Float64, k1::Float64, k2::Float64)
     return k1*(substrate1+substrate2) - k2*(product1+product2)
 end
 
@@ -201,16 +205,21 @@ end
 
 function insertRandModel(generation, start_index, stop_index; nK=Int64[])
     # input: Array with fitness in first column and k values in second column
-        # If the optional argument nK is set to an integer, then that number of k values will be randomly selected and varied
+        # If the optional argument nK is set to an integer, then that number of
+        # k values will be randomly selected and varied
         # and the rest of the k values from the previous generation will remain
-    # output: the SAME array with new models with random k values and their fitness scores in rows start_index through stop_index
+    # output: the SAME array with new models with random k values and their
+    # fitness scores in rows start_index through stop_index
     # Places random models and their fitness scores into the generation array
     for i = start_index:stop_index
         randM = createModel()
         if nK != Int64[] # If the optional argument is used
             randM.kVals = generation[i,2] # carry over previous k values
-            for j = 1:nK[1] # vary a single random k value, repeat nK times, (could end up being the same k value more than once)
-                randM = randomK!(randM, positions = rand(1:1:length(randM.rxns))) # randomly vary a single k value
+            for j = 1:nK[1]
+                # vary a single random k value, repeat nK times,
+                # (could end up being the same k value more than once)
+                randM = randomK!(randM, positions =
+                rand(1:1:length(randM.rxns))) # randomly vary a single k value
             end
         end
         fitScore = fitness(truePerturbMat, randM)
@@ -232,7 +241,8 @@ end
 
 function insertMutatedModel(generation, start_index)
     # input: Array with fitness in first column and k values in second column
-    # output: the same array with random models and their fitness scores in rows start_index through start_index + nElite
+    # output: the same array with random models and their fitness scores in
+    # rows start_index through start_index + nElite
     # Places random models and their fitness scores into the generation array
     # with 80/20 acceptance/rejection if the new model has worse fitness
     n = 1
@@ -266,9 +276,11 @@ end
 
 function mutateK!(m; positions = collect(1:length(m.rxns)), improve = true )
     # IN: model to be mutated by +/- 60%
-        # Default: all k values are mutated, new model is (most likely ) more fit than old
-        # If positions is set to a custom integer array, then only k's in those positions will vary
-        # If improve = false, then the new model is accepted regardless of fitness
+        # Default: all k values are mutated, new model is (most likely ) more
+        #fit than old
+        # If positions is set to a custom integer array, then only k's in those
+        # positions will vary
+        # If improve = false, then the new model accepted regardless of fitness
     # Return model m and its fitness
     oldM = deepcopy(m)
     oldK = oldM.kVals
@@ -276,7 +288,7 @@ function mutateK!(m; positions = collect(1:length(m.rxns)), improve = true )
     while check == false
         if positions == collect(1:length(m.rxns))
             newK = m.kVals
-            up_down = rand(0.4:1.2:1.6, length(m.rxns)) # randomly mutate some upward and some downwards
+            up_down = rand(0.4:1.2:1.6, length(m.rxns))
             newK = newK.*up_down
             bool = newK.>0.01
             if (0 in bool) == true
@@ -311,9 +323,11 @@ function crossover(generation, nElite)
     # Takes a sorted generation and randomly pairs the elite chromosomes
     # Outputs the modified UNSORTED generation array with the offspring k values
     # Pairing is random
-    # nElite should be even, I'll put a check for this later unless we use a different pairing strategy
+    # nElite should be even, I'll put a check for this later unless we use a
+    # different pairing strategy
     # 2 parents make 2 offspring, all 4 included in subsequent generation
-    # Subsequent generation is the input array with modified values, no new generation array created
+    # Subsequent generation is the input array with modified values, no new
+    # generation array created
     matingPop = randperm(nElite::Int64)
     nPair = Int64(nElite/2) # number of pairs
     nK = getNumberOfReactions(trueM) # number of k values
@@ -323,7 +337,9 @@ function crossover(generation, nElite)
     for i = 1:nPair
         crossPt1 = rand(1:1:nK)
         crossPt2 = rand(1:1:nK)
-        while crossPt1 == crossPt2 # prevent cross points from being the same, which can cause duplication
+        while crossPt1 == crossPt2
+            # prevent cross points from being the same, which can cause
+            # duplication
             crossPt2 = rand(1:1:nK)
         end
         crossPt1, crossPt2 = min(crossPt1,crossPt2), max(crossPt1,crossPt2)
@@ -331,8 +347,10 @@ function crossover(generation, nElite)
         kNew2 = deepcopy(generation[dad[i],2]) # deepcopy father k values
         β = rand(1) # random number between 0 and 1
         for j = crossPt1:crossPt2
-            kNew1[j] = β[1]*generation[mom[i],2][j] + (1-β[1])*generation[dad[i],2][j]
-            kNew2[j] = (1-β[1])*generation[mom[i],2][j] + β[1]*generation[dad[i],2][j]
+            kNew1[j] = β[1]*generation[mom[i],2][j] + (1-β[1])*
+            generation[dad[i],2][j]
+            kNew2[j] = (1-β[1])*generation[mom[i],2][j] + β[1]*
+            generation[dad[i],2][j]
         end
         m1 = createModel(bsp, fsp, rxns, Q, b0, kNew1)
         m2 = createModel(bsp, fsp, rxns, Q, b0, kNew2)
@@ -346,11 +364,12 @@ function crossover(generation, nElite)
 end
 
 function createPerturbationMatrix(m)
-    # Create a perturbation matrix for the model m with each enzyme up/downregulated by a factor.
+    # Create a perturbation matrix for the model m
     # Assumes that fy and u0 are already defined.
     # fy is the steady state concentration of floating species
     # u0 is the initial concentration of floating species
-    simPerturbMat = Array{Any}(undef, getNumberOfFloatingSpecies(m), getNumberOfReactions(m))
+    simPerturbMat = Array{Any}(undef, getNumberOfFloatingSpecies(m),
+    getNumberOfReactions(m))
     for i=1:getNumberOfReactions(m)
         # Get reference enzyme concentration
         refsol = nlsolve((du,fy) ->odefunc!(du,fy,m,t), u0)
@@ -379,7 +398,8 @@ end
 function fitness(perturbationMatrix, m)
     # Input: true perturbation matrix and a model, m
     # Output: fitness score for model m
-    # Quantifies the difference between an experimental and simulated perturbation matrix
+    # Quantifies the difference between an experimental and simulated
+    # perturbation matrix
     # Matrices must be the same size
     simPerturbationMatrix = createPerturbationMatrix(m)
     return fitness  = sqrt(sum((simPerturbationMatrix.-perturbationMatrix).^2))
@@ -389,7 +409,6 @@ function createEmptyRxnArray(num)
     # In: how many reactions you want in the array
     # Out: array with num empty reactions
     # For now: 1 substrate and 1 product per reaction, all basicEnzyme type
-    # I can't figure out how to do this more efficiently even with use of fill() and deepcopy()
     reactions = Array{Reaction,1}(undef,num)
     for i = 1:num
         reactions[i] = Reaction(["x"],["x"],["x"],basicEnzyme,1.)
@@ -397,10 +416,12 @@ function createEmptyRxnArray(num)
     return reactions
 end
 
-function createModel(;k=Float64[]::Array{Float64,1}, rxns=true::Bool, Q=trueQ::Array{Float64,1})::Model
-    # This function creates a new instance of the type Model with random k values
+function createModel(;k=Float64[]::Array{Float64,1}, rxns=true::Bool,
+    Q=trueQ::Array{Float64,1})::Model
+    # This function creates a new instance of the type Model with random k vals
     # Input: Array of q values, array of k values, boolean
-        # If createModel() is called with no arguments, output model will have random k values,
+        # If createModel() is called with no arguments, output model will have
+        # random k values,
         # reaction topology and q values identical to true model
     # Output: new model
         # k = [] (default) -- generate random k values
@@ -430,10 +451,12 @@ function createModel(;k=Float64[]::Array{Float64,1}, rxns=true::Bool, Q=trueQ::A
 end
 
 function createGen1(m, nIndividuals)
-    # This function requires that the arguments for createModel, bsp, fsp, rxns, Q, b0,
+    # This function requires that the arguments for createModel, bsp, fsp, rxns,
+    # Q, b0,
     # are defined elsewhere in the script
     # Input: inital model m, number of individuals in generation
-    # Outputs a sorted generation of nIndividuals random models (random k values)
+    # Outputs a sorted generation of nIndividuals random models (random k
+    # values)
     generation1 = Array{Any}(undef, nIndividuals, 2)
     for i = 1:nIndividuals
         temp = createModel(bsp, fsp, rxns, Q, b0)
@@ -460,19 +483,20 @@ function createNewGenElite(generation1,nIndividuals,nElite)
     newGeneration[1:nElite,:] = generation1[1:nElite,:]
     return newGeneration
 end
-ffunction createNetworkModel(bsp,fsp,k=trueK,q=trueQ,enzyme=enzyme)
+
+function createNetworkModel(bsp,fsp,k=trueK,q=trueQ,enzyme=enzyme)
     # ATTN: 2020-06-22 there's a bug that allows Xo to be selected as a product
     # Input: string arrays for boundary and floating species
         # Optional arguments: k values, q values, enzymes.
         # Set to true values by default for now.
     # Output: model with random toplogy
-    # Puts in true k and q values, basicEnzyme as reaction type, and ignores reg for now.
+    # Puts in true k and q values, basicEnzyme as reaction type, and ignores
+    # reg for now.
 
-    # Let's allocate some arrays!
-    reactions = fill(Reaction(["s"], ["p"], ["reg"], basicEnzyme, 1.0),(length(enzyme)))
-    prod_list = deepcopy(fsp)
+    reactions = fill(Reaction(["s"], ["p"], ["reg"], basicEnzyme, 1.0),
+    (length(enzyme)))
     sub_list = Array{String,1}(undef,0)
-    enzyme_list = deepcopy(enzyme)
+    enzyme_list = shuffle!(deepcopy(enzyme))
     sp_sets = fill(("s","p"), (length(enzyme)))
     reg = ["reg"]
 
@@ -497,7 +521,7 @@ ffunction createNetworkModel(bsp,fsp,k=trueK,q=trueQ,enzyme=enzyme)
     # Substrate selection for reactions 3:end
     for i = 3:length(enzyme)
         # substrate selection
-        if (i-2) <= length(fsp) # add each floating species as a substrate first
+        if (i-2) <= length(fsp)
             s = fsp[i-2]
         else # once every floating species is used, pick randomly
             β = rand(1)
@@ -513,27 +537,27 @@ ffunction createNetworkModel(bsp,fsp,k=trueK,q=trueQ,enzyme=enzyme)
 
     # product selection for reactions 3:end
     @label product_selection
-    println("we visited the product_selection label")
     sp_sets[3:end] = fill(("s","p"),(length(sp_sets)-2,1))
+    prod_list = deepcopy(fsp)
     for i = 3:length(rxns)
-        s = sub_list[i-2] # Set s to first item on sub_list, in this case S1 (randomly picked as sub for X1)
+        s = sub_list[i-2]
         p = s
-        while p == s # repeat product selection until a product that is different from the substrate is selected
-            set = (s, p) # (S1, S1)
+        while p == s
+            set = (s, p)
             sp_sets[i] = set
             let set = set
-                if length(prod_list) != 0 # If there are still species that have not been products, use those
+                if length(prod_list) != 0
+                    # If there are still species that have not been products,
+                    # use those
                     if prod_list == [s]
-                        println("product list exception block reached") #If the only product left to choose from is the same as the substrate, back track 1 reaction and re-do selection
+                        # If the only product left to choose from is the same as
+                        # the substrate, re-do selection
                         @goto product_selection
-                        #@goto endfunction # Go back to beginning of product selection block
                     end
                     let counter = 1 # To prevent infinite loops
-                        while isPairIn(set, sp_sets) == true #we got stuck in this loop, prod_list != [s]
+                        while isPairIn(set, sp_sets) == true
                             if counter > 10
-                                println("Invalid Model")
                                 @goto product_selection
-                                #@goto endfunction
                             end
                             α = rand(1:1:length(prod_list))
                             p = prod_list[α]
@@ -541,9 +565,10 @@ ffunction createNetworkModel(bsp,fsp,k=trueK,q=trueQ,enzyme=enzyme)
                             counter += 1
                         end
                     end #of let counter...
-                else #if every species has been a product once, choose randomly from all of them for remaining reactions
+                else
+                    #if every species has been a product once, choose randomly
+                    # from all of them for remaining reactions
                     while isPairIn(set, sp_sets) == true
-                        println("we are in the while loop on line 84")
                         β = rand(1)
                         if β[1] < 0.05
                                 p = bsp[2]
@@ -559,20 +584,15 @@ ffunction createNetworkModel(bsp,fsp,k=trueK,q=trueQ,enzyme=enzyme)
         end #of while p==s loop
         filter!(prod_list->prod_list≠p,prod_list)
         sp_sets[i] = (s,p)
-        α = rand(1:1:length(enzyme_list)) # randomly select an enzyme that has yet to be used
-        e = enzyme_list[α]
-        filter!(enzyme_list->enzyme_list≠e,enzyme_list)
-        reactions[i] = Reaction([s],[p],reg,basicEnzyme,e)
+        reactions[i] = Reaction([s],[p],reg,basicEnzyme,enzyme_list[i])
     end # of reaction for-loop
     m = Model(bsp,fsp,reactions,trueK,trueQ,by)
-    #return m
-    @label endfunction
-    return sp_sets
+    return m
 end
 
-
 function isPairIn(sp, spArray)
-    # Checks if a substrate-product species pair is in another array without respect to the order of the tuple
+    # Checks if a substrate-product species pair is in another array without
+    # respect to the order of the tuple
     # Meaning ("S2","S4") is equivalent to ("S4","S2") for example
     # IN: substrate-product tuple and an array of substrate-product tuples
     # OUT: boolean - true/false sp is in spArray
@@ -587,7 +607,8 @@ end
 
 function isSetUnique(product,enzyme)
     # For use in network crossover function
-    # Returns true if neither the product nor the enzyme has been used previously
+    # Returns true if neither the product nor the enzyme has been used
+    # previously
     if (product in pList) == false && (enzyme in eList) == false
         return true
     else
@@ -610,14 +631,15 @@ end
 
 
 function testTopologyModel(m::Model)
-    # This is a function for me to test if generated models have "valid" networks
+    # This is a function to test if generated models have "valid" networks
     substrates = Array{String}(undef, length(m.rxns))
     products = Array{String}(undef, length(m.rxns))
     for i = 1:length(m.rxns)
         substrates[i] = m.rxns[i].substrate[1]
         products[i] = m.rxns[i].product[1]
     end
-    # Make sure every floating species is used at least once as both a product and reactant
+    # Make sure every floating species is used at least once as both a
+    # product and reactant
     for sp in m.floating
         if (sp in substrates) == false
             error("Species ",sp," not found amongst substrates")
@@ -628,7 +650,8 @@ function testTopologyModel(m::Model)
             result = "PASS"
         end
     end
-    # Make sure the boundary species are properly connected (eg. Xo is never a product)
+    # Make sure the boundary species are properly connected (eg. Xo is
+    # never a product)
     if (m.boundary[1] in products) == true
         error(m.boundary[1], "found amongst products")
         result = "FAIL"
@@ -664,7 +687,8 @@ r5 = Reaction(s5,p5,reg5,basicEnzyme,enzyme[5])
 r6 = Reaction(s6,p6,reg6,basicEnzyme,enzyme[6])
 r7 = Reaction(s7,p7,reg7,basicEnzyme,enzyme[7])
 
-trueM = Model(["Xo", "X1"], ["S1", "S2","S3","S4","S5"], [r1, r2, r3, r4, r5, r6, r7], trueK, trueQ, [10.,0.])
+trueM = Model(["Xo", "X1"], ["S1", "S2","S3","S4","S5"], [r1, r2, r3, r4,
+r5, r6, r7], trueK, trueQ, [10.,0.])
 
 #--------ODE INFO------------------------
 const u0 = zeros(length(trueM.floating))
@@ -685,7 +709,7 @@ by = trueM.by
 #-----------DEVELOPING TOPOLOGY CROSSOVER-----------------
 #
 # # Parents
-# modelA = createNetworkModel(bsp,fsp) # TODO: Change these so they also have random enzyme order
+# modelA = createNetworkModel(bsp,fsp)
 # modelB = createNetworkModel(bsp,fsp)
 #
 # # Empty offspring
@@ -706,7 +730,8 @@ by = trueM.by
 # sList = Array{String,1}(undef,0)
 # pList = Array{String,1}(undef,0)
 # eList = Array{Float64,1}(undef,0)
-# SPset = fill(("s","p"), (length(modelA.rxns), 1)) # Keep track of offspring s-p pairs
+# SPset = fill(("s","p"), (length(modelA.rxns), 1)) # Keep track of offspring
+# # s-p pairs
 #
 #
 # # Make sure that boundary species are in offspring model:
